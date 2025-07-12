@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Calculadora de Agua - Enfriamiento Data Center</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #1e3c72, #2a5298);
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      font-size: 2.2em;
+      text-align: center;
+    }
+
+    .main-content {
+      display: flex;
+      gap: 30px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      max-width: 1300px;
+    }
+
+    .container {
+      background-color: rgba(255, 255, 255, 0.1);
+      padding: 30px 40px;
+      border-radius: 20px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 450px;
+    }
+
+    label {
+      display: block;
+      margin: 10px 0 5px;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border: none;
+      border-radius: 10px;
+      background-color: #f0f4f8;
+      color: #333;
+      font-size: 1em;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #00c9a7;
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-size: 1.1em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #00a88e;
+    }
+
+    #resultado {
+      margin-top: 20px;
+      font-size: 1.2em;
+      text-align: center;
+      background-color: rgba(0,0,0,0.2);
+      padding: 15px;
+      border-radius: 10px;
+    }
+
+    .formula {
+      margin-top: 20px;
+      background-color: rgba(255,255,255,0.1);
+      padding: 15px;
+      border-radius: 15px;
+      font-size: 1em;
+      line-height: 1.6;
+    }
+
+    .formula code {
+      font-family: 'Courier New', monospace;
+      background-color: rgba(0,0,0,0.2);
+      padding: 2px 5px;
+      border-radius: 5px;
+      display: block;
+      margin: 5px 0;
+    }
+
+    .grafico-area {
+      max-width: 700px;
+      width: 100%;
+    }
+
+    canvas {
+      margin-top: 15px;
+      background: #fff;
+      border-radius: 10px;
+      padding: 5px;
+    }
+
+    footer {
+      margin-top: 40px;
+      font-size: 0.9em;
+      opacity: 0.7;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>💧 Calculadora de Enfriamiento de Data Center</h1>
+
+  <div class="main-content">
+    <!-- Calculadora -->
+    <div class="container">
+      <label for="q">🔌 Potencia térmica (Q) en watts:</label>
+      <input type="number" id="q" placeholder="Ej: 100000">
+
+      <label for="t">⏱ Tiempo de funcionamiento (horas):</label>
+      <input type="number" id="t" placeholder="Ej: 4">
+
+      <label for="deltaT">🌡 Diferencia de temperatura (°C):</label>
+      <input type="number" id="deltaT" placeholder="Ej: 10">
+
+      <button onclick="calcular()">Calcular Litros de Agua</button>
+
+      <div id="resultado"></div>
+
+      <div class="formula">
+        <strong>📘 Modelo Matemático:</strong><br>
+        <code>E = Q × t × 3600</code>
+        <code>m = E / (c × ΔT)</code>
+        <code>dT/dt = Q / (m × c)</code>
+      </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="grafico-area">
+      <canvas id="grafico" width="600" height="300"></canvas>
+
+      <div id="valorDerivada" class="formula">
+        <strong>📐 Derivada dT/dt:</strong><br>
+        <code id="derivadaTexto">Resultado:</code>
+      </div>
+
+      <canvas id="graficoDerivada" width="600" height="250"></canvas>
+    </div>
+  </div>
+
+  <footer>
+    Proyecto de Cálculo Diferencial – Christian Galíndez
+  </footer>
+
+  <script>
+    let graficoChart;
+    let graficoDerivadaChart;
+
+    function calcular() {
+      const q = parseFloat(document.getElementById('q').value);
+      const t = parseFloat(document.getElementById('t').value);
+      const deltaT = parseFloat(document.getElementById('deltaT').value);
+
+      if (isNaN(q) || isNaN(t) || isNaN(deltaT) || deltaT === 0) {
+        document.getElementById('resultado').innerText = "Por favor, ingresa todos los valores correctamente.";
+        return;
+      }
+
+      const energia = q * t * 3600;
+      const c = 4186;
+      const m = energia / (c * deltaT);
+
+      document.getElementById('resultado').innerText =
+        `🔹 Litros de agua necesarios: ${m.toFixed(2)} L`;
+
+      // Datos para gráfico de temperatura
+      const tiempo = [];
+      const temperatura = [];
+      const T0 = 25;
+      const t_max = t * 60;
+
+      for (let i = 0; i <= t_max; i += 1) {
+        tiempo.push(i);
+        const T = T0 + (q * (i * 60)) / (m * c);
+        temperatura.push(parseFloat(T.toFixed(2)));
+      }
+
+      if (graficoChart) graficoChart.destroy();
+      const ctx = document.getElementById('grafico').getContext('2d');
+      graficoChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: tiempo,
+          datasets: [{
+            label: 'Temperatura (°C) vs Tiempo (min)',
+            data: temperatura,
+            fill: false,
+            borderColor: '#00f0ff',
+            tension: 0.2,
+            pointRadius: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: true }
+          },
+          scales: {
+            x: { title: { display: true, text: 'Tiempo (min)' } },
+            y: { title: { display: true, text: 'Temperatura (°C)' } }
+          }
+        }
+      });
+
+      // Derivada
+      const derivada = q / (m * c);
+      document.getElementById('derivadaTexto').innerText =
+        `dT/dt = ${derivada.toFixed(5)} °C/s`;
+
+      const derivadaData = Array(tiempo.length).fill(derivada);
+
+      if (graficoDerivadaChart) graficoDerivadaChart.destroy();
+      const ctxDerivada = document.getElementById('graficoDerivada').getContext('2d');
+      graficoDerivadaChart = new Chart(ctxDerivada, {
+        type: 'line',
+        data: {
+          labels: tiempo,
+          datasets: [{
+            label: 'Derivada dT/dt (°C/s)',
+            data: derivadaData,
+            borderColor: '#ffcc00',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.1,
+            pointRadius: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: true }
+          },
+          scales: {
+            x: { title: { display: true, text: 'Tiempo (min)' } },
+            y: { title: { display: true, text: 'dT/dt (°C/s)' } }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
